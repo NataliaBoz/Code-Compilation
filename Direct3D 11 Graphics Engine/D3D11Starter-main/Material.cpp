@@ -2,12 +2,14 @@
 
 Material::Material(const char* name,
 	DirectX::XMFLOAT4 colorTint,
+	float roughness,
 	std::shared_ptr<SimpleVertexShader> vertShader,
 	std::shared_ptr<SimplePixelShader> pixShader,
 	DirectX::XMFLOAT2 uvScale,
 	DirectX::XMFLOAT2 uvOffset):
 		name(name),
 		colorTint(colorTint),
+		roughness(roughness),
 		vertShader(vertShader),
 		pixShader(pixShader),
 		uvScale(uvScale),
@@ -18,6 +20,7 @@ Material::Material(const char* name,
 // Getters
 const char* Material::GetMaterialName() { return name; }
 DirectX::XMFLOAT4 Material::GetColorTint() { return colorTint; }
+float Material::GetRoughness() { return roughness; }
 std::shared_ptr<SimpleVertexShader> Material::GetVertexShader() { return vertShader; }
 std::shared_ptr<SimplePixelShader> Material::GetPixelShader() { return pixShader; }
 DirectX::XMFLOAT2 Material::GetUVScale() { return uvScale; }
@@ -27,6 +30,7 @@ std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11SamplerState>> Mate
 
 // Setters
 void Material::SetColorTint(DirectX::XMFLOAT4 tint) { this->colorTint = tint; }
+void Material::SetRoughness(float roughness) { this->roughness = roughness; }
 void Material::SetVertexShader(std::shared_ptr<SimpleVertexShader> vertShader) { this->vertShader = vertShader; }
 void Material::SetPixelShader(std::shared_ptr<SimplePixelShader> pixShader) { this->pixShader = pixShader; }
 void Material::SetUVScale(DirectX::XMFLOAT2 uvScale) { this->uvScale = uvScale; }

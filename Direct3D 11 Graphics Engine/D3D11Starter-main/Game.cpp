@@ -9,6 +9,7 @@
 #include "Camera.h"
 #include "SimpleShader.h"
 #include "Material.h"
+#include "Lights.h"
 
 #include <DirectXMath.h>
 #include <memory> // Smart Pointers
@@ -82,6 +83,49 @@ void Game::Initialize()
 
 		cameraViews.push_back(frontCamera);
 		cameraViews.push_back(sideCamera);
+
+		// Create *lights!*
+		Light directionalLight1 = {}; // Initialize with 0's
+		directionalLight1.Type = LIGHT_TYPE_DIRECTIONAL;
+		directionalLight1.Direction = XMFLOAT3(1.0f, 0.0f, 0.0f); // Uses Direction instead of Position
+		directionalLight1.Color = XMFLOAT3(1.0f, 1.0f, 0.2f);
+		directionalLight1.Intensity = 1.0;
+
+		Light directionalLight2 = {}; 
+		directionalLight2.Type = LIGHT_TYPE_DIRECTIONAL;
+		directionalLight2.Direction = XMFLOAT3(0.0f, 1.0f, 1.0f);
+		directionalLight2.Color = XMFLOAT3(0.2f, 1.0f, 1.0f);
+		directionalLight2.Intensity = 1.0;
+
+		Light directionalLight3 = {}; 
+		directionalLight3.Type = LIGHT_TYPE_DIRECTIONAL;
+		directionalLight3.Direction = XMFLOAT3(0.5f, 0.5f, 1.0f);
+		directionalLight3.Color = XMFLOAT3(1.0f, 0.2f, 1.0f);
+		directionalLight3.Intensity = 1.0;
+
+		Light pointLight1 = {};
+		pointLight1.Type = LIGHT_TYPE_POINT;
+		pointLight1.Position = XMFLOAT3(0.0f, 0.0f, 2.0f);  // Uses Position instead of Direction
+		pointLight1.Color = XMFLOAT3(0.25f, 0.25f, 0.25f);
+		pointLight1.Intensity = 2.5;
+		pointLight1.Range = 10.0f;
+
+		Light spotLight1 = {};
+		spotLight1.Type = LIGHT_TYPE_SPOT;
+		spotLight1.Direction = XMFLOAT3(0.0f, -1.0f, 0.0f);
+		spotLight1.Position = XMFLOAT3(3.0f, 1.75f, 0.0f);
+		spotLight1.Color = XMFLOAT3(0.0f, 1.0f, 0.5f);
+		spotLight1.Intensity = 1.25;
+		spotLight1.Range = 10.0f;
+		spotLight1.SpotOuterAngle = XMConvertToRadians(30.0f);
+		spotLight1.SpotInnerAngle = XMConvertToRadians(15.0f);	
+
+		// Add each light source to the list
+		lights.push_back(directionalLight1);
+		lights.push_back(directionalLight2);
+		lights.push_back(directionalLight3);
+		lights.push_back(pointLight1);
+		lights.push_back(spotLight1);
 	}
 }
 
@@ -110,6 +154,7 @@ void Game::CreateGeometry()
 		Graphics::Device, Graphics::Context, FixPath(L"VertexShader.cso").c_str());
 	std::shared_ptr<SimplePixelShader> pixelShader = std::make_shared<SimplePixelShader>(
 		Graphics::Device, Graphics::Context, FixPath(L"PixelShader.cso").c_str());
+
 	// UVs Pixel Shader
 	std::shared_ptr<SimplePixelShader> uvsPS = std::make_shared<SimplePixelShader>(
 		Graphics::Device, Graphics::Context, FixPath(L"UVsPS.cso").c_str());
@@ -122,6 +167,12 @@ void Game::CreateGeometry()
 	// Combining Textures Pixel Shader
 	std::shared_ptr<SimplePixelShader> combinePS = std::make_shared<SimplePixelShader>(
 		Graphics::Device, Graphics::Context, FixPath(L"CombinePS.cso").c_str());
+
+	// Sky box shaders
+	std::shared_ptr<SimpleVertexShader> skyVS = std::make_shared<SimpleVertexShader>(
+		Graphics::Device, Graphics::Context, FixPath(L"SkyVS.cso").c_str());
+	std::shared_ptr<SimplePixelShader> skyPS = std::make_shared<SimplePixelShader>(
+		Graphics::Device, Graphics::Context, FixPath(L"SkyPS.cso").c_str());
 
 	// Create some temporary variables to represent colors
 	// - Not necessary, just makes things more readable
@@ -208,8 +259,19 @@ void Game::CreateGeometry()
 
 	// Load textures
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> arcadeFloorSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> arcadeFloorNormalSRV;
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> blackTealMarbleSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> blackTealMarbleNormalSRV;
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> blueTravertineSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> blueTravertineNormalSRV;
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> woodDiagArrowsSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> woodDiagArrowsNormalSRV;
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> smoothedRockSRV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> smoothedRockNormalSRV;
 	
 
 	// Repeat for EACH texture to load from file (PNG preferable, but JPG also works)
@@ -219,6 +281,12 @@ void Game::CreateGeometry()
 		FixPath(L"../../Assets/Textures/ArcadeFloor.png").c_str(), // Texture
 		0, // Not the actual texture object, could also use nullptr
 		arcadeFloorSRV.GetAddressOf()); // Get SRV
+	// Normal map
+	CreateWICTextureFromFile(Graphics::Device.Get(), 
+		Graphics::Context.Get(), 
+		FixPath(L"../../Assets/Textures/Carpet016_1K-PNG_NormalDX.png").c_str(),
+		0,
+		arcadeFloorNormalSRV.GetAddressOf());
 
 	// Black & teal marble texture
 	CreateWICTextureFromFile(Graphics::Device.Get(),
@@ -226,6 +294,12 @@ void Game::CreateGeometry()
 		FixPath(L"../../Assets/Textures/Marble009_1K-PNG_Color.png").c_str(), 
 		0, 
 		blackTealMarbleSRV.GetAddressOf());
+	// Normal map
+	CreateWICTextureFromFile(Graphics::Device.Get(),
+		Graphics::Context.Get(),
+		FixPath(L"../../Assets/Textures/Marble009_1K-PNG_NormalDX.png").c_str(),
+		0,
+		blackTealMarbleNormalSRV.GetAddressOf());
 
 	// Light blue travertine texture
 	CreateWICTextureFromFile(Graphics::Device.Get(),
@@ -233,6 +307,38 @@ void Game::CreateGeometry()
 		FixPath(L"../../Assets/Textures/Travertine013_1K-PNG_Color.png").c_str(),
 		0,
 		blueTravertineSRV.GetAddressOf());
+	//  Normal map
+	CreateWICTextureFromFile(Graphics::Device.Get(),
+		Graphics::Context.Get(),
+		FixPath(L"../../Assets/Textures/Marble009_1K-PNG_NormalDX.png").c_str(),
+		0,
+		blueTravertineNormalSRV.GetAddressOf());
+
+	// Wood floor (Diagonal arrows pattern) texture
+	CreateWICTextureFromFile(Graphics::Device.Get(),
+		Graphics::Context.Get(),
+		FixPath(L"../../Assets/Textures/WoodFloor058_1K-PNG_Color.png").c_str(),
+		0,
+		woodDiagArrowsSRV.GetAddressOf());
+	//  Normal map
+	CreateWICTextureFromFile(Graphics::Device.Get(),
+		Graphics::Context.Get(),
+		FixPath(L"../../Assets/Textures/WoodFloor058_1K-PNG_NormalDX.png").c_str(),
+		0,
+		woodDiagArrowsNormalSRV.GetAddressOf());
+
+	// Smoothed rock cliff texture
+	CreateWICTextureFromFile(Graphics::Device.Get(),
+		Graphics::Context.Get(),
+		FixPath(L"../../Assets/Textures/Rock015_1K-PNG_Color.png").c_str(),
+		0,
+		smoothedRockSRV.GetAddressOf());
+	//  Normal map
+	CreateWICTextureFromFile(Graphics::Device.Get(),
+		Graphics::Context.Get(),
+		FixPath(L"../../Assets/Textures/Rock015_1K-PNG_NormalDX.png").c_str(),
+		0,
+		smoothedRockNormalSRV.GetAddressOf());
 		
 	// Create a sampler
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler;
@@ -253,24 +359,39 @@ void Game::CreateGeometry()
 	//normalsMaterial = std::make_shared<Material>(XMFLOAT4(1, 1, 1, 1), vertexShader, normalsPS, "Normals"); 
 	//customMaterial = std::make_shared<Material>(XMFLOAT4(1, 1, 1, 1), vertexShader, customPS, "Custom"); // Fuzzy Bumblebee???
 
-	// Textured materials
-	arcadeFloorMaterial = std::make_shared<Material>("Arcade Floor", XMFLOAT4(1, 1, 1, 1), vertexShader, pixelShader, XMFLOAT2(2, 2));
+	// Textured materials (with normal maps)
+	arcadeFloorMaterial = std::make_shared<Material>("Arcade Floor", XMFLOAT4(1, 1, 1, 1), 0.25f, vertexShader, pixelShader, XMFLOAT2(2, 2));
 	arcadeFloorMaterial->AddSampler("BasicSampler", sampler);
 	arcadeFloorMaterial->AddTextureSRV("SurfaceTexture", arcadeFloorSRV);
+	arcadeFloorMaterial->AddTextureSRV("NormalMap", arcadeFloorNormalSRV);
 
-	blackTealMarbleMaterial = std::make_shared<Material>("Black & Teal Marble", XMFLOAT4(1, 1, 1, 1), vertexShader, pixelShader);
+	blackTealMarbleMaterial = std::make_shared<Material>("Black & Teal Marble", XMFLOAT4(1, 1, 1, 1), 0.75f, vertexShader, pixelShader);
 	blackTealMarbleMaterial->AddSampler("BasicSampler", sampler);
 	blackTealMarbleMaterial->AddTextureSRV("SurfaceTexture", blackTealMarbleSRV);
+	blackTealMarbleMaterial->AddTextureSRV("NormalMap", blackTealMarbleNormalSRV);
 
-	blueTravertineMaterial = std::make_shared<Material>("Light Blue Travertine", XMFLOAT4(1, 1, 1, 1), vertexShader, pixelShader, XMFLOAT2(0.5f, 0.5f));
+	blueTravertineMaterial = std::make_shared<Material>("Light Blue Travertine", XMFLOAT4(1, 1, 1, 1), 0.5f, vertexShader, pixelShader, XMFLOAT2(0.5f, 0.5f));
 	blueTravertineMaterial->AddSampler("BasicSampler", sampler);
 	blueTravertineMaterial->AddTextureSRV("SurfaceTexture", blueTravertineSRV);
+	blueTravertineMaterial->AddTextureSRV("NormalMap", blueTravertineNormalSRV);
 
-	deepBlueTravertineMaterial = std::make_shared<Material>("Deep Blue Travertine", XMFLOAT4(0.25f, 0.35f, 1, 1), vertexShader, pixelShader);
+	deepBlueTravertineMaterial = std::make_shared<Material>("Deep Blue Travertine", XMFLOAT4(0.25f, 0.35f, 1, 1), 0.5f, vertexShader, pixelShader);
 	deepBlueTravertineMaterial->AddSampler("BasicSampler", sampler);
 	deepBlueTravertineMaterial->AddTextureSRV("SurfaceTexture", blueTravertineSRV);
+	deepBlueTravertineMaterial->AddTextureSRV("NormalMap", blueTravertineNormalSRV);
 
-	comboMaterial = std::make_shared<Material>("Combination", XMFLOAT4(1, 1, 1, 1), vertexShader, combinePS);
+	woodDiagArrowsMaterial = std::make_shared<Material>("Diagonal Arrows Wood Pattern", XMFLOAT4(1, 1, 1, 1), 0.75f, vertexShader, pixelShader);
+	woodDiagArrowsMaterial->AddSampler("BasicSampler", sampler);
+	woodDiagArrowsMaterial->AddTextureSRV("SurfaceTexture", woodDiagArrowsSRV);
+	woodDiagArrowsMaterial->AddTextureSRV("NormalMap", woodDiagArrowsNormalSRV);
+
+	smoothedRockMaterial = std::make_shared<Material>("Smoothed Rock Cliff", XMFLOAT4(1, 1, 1, 1), 0.75f, vertexShader, pixelShader);
+	smoothedRockMaterial->AddSampler("BasicSampler", sampler);
+	smoothedRockMaterial->AddTextureSRV("SurfaceTexture", smoothedRockSRV);
+	smoothedRockMaterial->AddTextureSRV("NormalMap", smoothedRockNormalSRV);
+
+	// *NOTE: Currently NOT affected by lights & has NO normal map*
+	comboMaterial = std::make_shared<Material>("Combination", XMFLOAT4(1, 1, 1, 1), 0.25f, vertexShader, combinePS);
 	comboMaterial->AddSampler("BasicSampler", sampler);
 	comboMaterial->AddTextureSRV("InitialTexture", blueTravertineSRV);
 	comboMaterial->AddTextureSRV("CombineTexture", arcadeFloorSRV);
@@ -286,14 +407,16 @@ void Game::CreateGeometry()
 	materials.push_back(blackTealMarbleMaterial);
 	materials.push_back(blueTravertineMaterial);
 	materials.push_back(deepBlueTravertineMaterial);
+	materials.push_back(woodDiagArrowsMaterial);
+	materials.push_back(smoothedRockMaterial);
 	materials.push_back(comboMaterial);
 
 	// Create pointers to each 3D entity & add to the list for drawing
-	entities.push_back(std::make_shared<GameEntity>(cubeMesh, arcadeFloorMaterial));
+	entities.push_back(std::make_shared<GameEntity>(cubeMesh, woodDiagArrowsMaterial));
 	entities.push_back(std::make_shared<GameEntity>(cylinderMesh, blackTealMarbleMaterial));
-	entities.push_back(std::make_shared<GameEntity>(helixMesh, blueTravertineMaterial));
+	entities.push_back(std::make_shared<GameEntity>(helixMesh, smoothedRockMaterial));
 	entities.push_back(std::make_shared<GameEntity>(quadMesh, comboMaterial));
-	entities.push_back(std::make_shared<GameEntity>(doubleSidedQuadMesh, blackTealMarbleMaterial));
+	entities.push_back(std::make_shared<GameEntity>(doubleSidedQuadMesh, blueTravertineMaterial));
 	entities.push_back(std::make_shared<GameEntity>(sphereMesh, deepBlueTravertineMaterial));
 	entities.push_back(std::make_shared<GameEntity>(torusMesh, arcadeFloorMaterial));
 
@@ -302,6 +425,23 @@ void Game::CreateGeometry()
 	{
 		entities[i]->GetTransform()->MoveAbsolute(float(-9 + 3 * i), 0, 0); // Cast to a float to remove warning
 	}
+
+	// Lighting
+	ambientTerm = XMFLOAT3(0.43f, 0.40f, 0.43f); // A bit darker than the background
+
+	// Create the sky box
+	skyBox = std::make_shared<Sky>(
+		FixPath(L"../../Assets/Textures/Clouds Pink/right.png").c_str(),
+		FixPath(L"../../Assets/Textures/Clouds Pink/left.png").c_str(),
+		FixPath(L"../../Assets/Textures/Clouds Pink/up.png").c_str(),
+		FixPath(L"../../Assets/Textures/Clouds Pink/down.png").c_str(),
+		FixPath(L"../../Assets/Textures/Clouds Pink/front.png").c_str(),
+		FixPath(L"../../Assets/Textures/Clouds Pink/back.png").c_str(),
+		cubeMesh,
+		skyPS,
+		skyVS,
+		sampler
+		);
 }
 
 
@@ -350,7 +490,9 @@ void Game::RefreshImGui(float deltaTime)
 void Game::BuildUI(std::vector<std::shared_ptr<Mesh>> meshes,
 	std::vector<std::shared_ptr<GameEntity>> entities,
 	std::vector<std::shared_ptr<Camera>> cameraViews,
-	std::shared_ptr<Camera> &activeCamera)
+	std::shared_ptr<Camera> &activeCamera,
+	std::vector<Light> &lights,
+	DirectX::XMFLOAT3 &ambientTerm)
 {
 	// Create the UI window
 	ImGui::Begin("Inspector Window", 0, ImGuiWindowFlags_NoBackground);
@@ -496,6 +638,67 @@ void Game::BuildUI(std::vector<std::shared_ptr<Mesh>> meshes,
 		}
 	}
 
+	// Make a tab to display all the available materials
+	if (ImGui::CollapsingHeader("Lights:"))
+	{
+		
+		// Ambient light
+		if (ImGui::TreeNode("Node", "Ambient Light"))
+		{
+			ImGui::ColorEdit3("Ambient Color", &ambientTerm.x);
+			ImGui::TreePop();
+		}
+		
+		// Directional, point, & spot lights
+		for (int i = 0; i < lights.size(); i++)
+		{
+			std::string lightType = " Light (%u)";
+
+			switch (lights[i].Type)
+			{
+				case LIGHT_TYPE_DIRECTIONAL:
+					lightType = "Directional" + lightType;
+					break;
+
+				case LIGHT_TYPE_POINT:
+					lightType = "Point" + lightType;
+					break;
+
+				case LIGHT_TYPE_SPOT:
+					lightType = "Spot" + lightType;
+					break;
+			}
+
+			// Support multiple widgets with the same name
+			ImGui::PushID(&lights[i]);
+
+			if (ImGui::TreeNode("Light Node", lightType.c_str(), i))
+			{
+				ImGui::ColorEdit3("Color", &lights[i].Color.x);
+				ImGui::SliderFloat("Intensity", &lights[i].Intensity, 0.0f, 5.0f);
+
+				/*if (ImGui::RadioButton("Directional", lights[i].Type == LIGHT_TYPE_DIRECTIONAL))
+				{
+					lights[i].Type == LIGHT_TYPE_DIRECTIONAL;
+				}
+				if (ImGui::RadioButton("Point", lights[i].Type == LIGHT_TYPE_POINT))
+				{
+					lights[i].Type == LIGHT_TYPE_POINT;
+				}
+				if (ImGui::RadioButton("Spot", lights[i].Type == LIGHT_TYPE_SPOT))
+				{
+					lights[i].Type == LIGHT_TYPE_SPOT;
+				}*/
+				
+
+				
+
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+	}
+
 	// End the current window
 	ImGui::End(); 
 }
@@ -509,7 +712,7 @@ void Game::Update(float deltaTime, float totalTime)
 	// Update ImGui UI
 	RefreshImGui(deltaTime);
 	// Create ImGui UI
-	BuildUI(meshes, entities, cameraViews, activeCamera);
+	BuildUI(meshes, entities, cameraViews, activeCamera, lights, ambientTerm);
 
 	// Example input checking: Quit if the escape key is pressed
 	if (Input::KeyDown(VK_ESCAPE))
@@ -558,10 +761,18 @@ void Game::Draw(float deltaTime, float totalTime)
 			// Bind the textures
 			//e->GetMaterial()->GetPixelShader()->SetShaderResourceView("ColorTexture", textureSRV);
 
+			e->GetMaterial()->GetPixelShader()->SetFloat3("ambientColor", ambientTerm);
 			e->GetMaterial()->GetPixelShader()->SetFloat("Time", totalTime);
+			e->GetMaterial()->GetPixelShader()->SetData(
+				"lights", // The name of the variable in the shader
+				&lights[0], // The address of the data to set
+				sizeof(Light) * (int)lights.size()); // The size of the data (the whole structs!) to set
 
 			e->Draw(activeCamera);
 		}
+
+		// Draw the sky box afterwards to avoid unnecessary work
+		skyBox->Draw(activeCamera);
 
 		ImGui::Render(); // Turns this frame’s UI into renderable triangles
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData()); // Draws it to the screen
@@ -586,3 +797,38 @@ void Game::Draw(float deltaTime, float totalTime)
 	}
 }
 
+/*
+void Game::RenderShadowMap()
+{
+	// Set up shadow map as depth buffer
+	Graphics::Context->ClearDepthStencilView(shadowOptions.ShadowDSV.Get(), D3D11_CLEAR_STENCIL??????????, 1.0f, 0);
+	Graphics::Context->OMSetRenderTargets(0, 0, shadowOptions.ShadowDSV.Get());
+
+	// Change other render state to prepare for the shadow render
+	D3D11_VIEWPORT viewport{};
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = (float)shadowOptions.ShadowMapResolution;
+	viewport.Height = (float)shadowOptions.ShadowMapResolution;
+	viewport.MinDepth = 0;
+	viewport.MaxDepth = 1;
+	Graphics::Context->RSSetViewports(1, &viewport);
+
+	// Set up shadow shaders
+	shadowVertexShader->SetShader();
+	Graphics::Context->PSSetShader(0, 0, 0);
+
+	shadowVertexShader->SetMatrix4x4("view", shadowOptions.LightViewMatrix);
+	shadowVertexShader->SetMAtrix4x4("projection", shadowOptions.LightProjectionMatrix);
+
+	// Loop thru entities & draw to the shadow map
+	for (auto& e : entities)
+	{
+
+	}
+
+	// Reset to the normal render target & back buffer
+	Graphics::Context->OMSetRenderTargets(1, Graphics::BackBufferRTV.GetAddressOf(), Graphics::		);
+
+	// 
+}*/

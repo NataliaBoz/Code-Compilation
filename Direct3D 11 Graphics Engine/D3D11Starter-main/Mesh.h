@@ -30,6 +30,7 @@ public:
 	// Methods
 	void CreateVertIndBuffers(Vertex* vertices, unsigned int vertCount, unsigned int* indices, unsigned int indCount);
 	void SetAndDrawBuffers(); // Sets the buffers and draws using the correct number of indices
+	void CalculateTangents(Vertex* verts, int numVerts, unsigned int* indices, int numIndices);
 
 private:
 	// ComPtrs for this mesh's buffers

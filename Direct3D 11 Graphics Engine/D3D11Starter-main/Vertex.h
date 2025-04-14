@@ -12,5 +12,5 @@ struct Vertex
 	DirectX::XMFLOAT3 Position;	    // The local position of the vertex
 	DirectX::XMFLOAT2 UV; //DirectX::XMFLOAT4 Color;	// The color of the vertex (for 2D meshes)
 	DirectX::XMFLOAT3 Normal;
-	DirectX::XMFLOAT3 Tangent;
+	DirectX::XMFLOAT3 Tangent; // Can be used to compute the bi-tangent vector as well
 };

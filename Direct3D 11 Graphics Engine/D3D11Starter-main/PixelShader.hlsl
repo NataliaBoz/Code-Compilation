@@ -1,31 +1,20 @@
+#include "ShaderInclude.hlsli" // Contains all necessary structs, helper functions, etc.
+
 cbuffer ExternalData : register(b0)
 {
 	float4 colorTint;
     float2 uvScale;
     float2 uvOffset;
-	//float3 cameraPos;
+    float roughness;
+	float3 currentCamPos;
+    float3 ambientColor;
+    Light lights[5]; // Max # of lights (must change before going over)
 }
 
 Texture2D SurfaceTexture : register(t0); // "t" registers for textures
-SamplerState BasicSampler : register(s0); // "s" registers for samplers
+Texture2D NormalMap : register(t1);
 
-// Struct representing the data we expect to receive from earlier pipeline stages
-// - Should match the output of our corresponding vertex shader
-// - The name of the struct itself is unimportant
-// - The variable names don't have to match other shaders (just the semantics)
-// - Each variable must have a semantic, which defines its usage
-struct VertexToPixel
-{
-	// Data type
-	//  |
-	//  |   Name          Semantic
-	//  |    |                |
-	//  v    v                v
-	float4 screenPosition	: SV_POSITION;
-	//float4 color			: COLOR;
-	float2 uv : TEXCOORD;
-	float3 normal : NORMAL;
-};
+SamplerState BasicSampler : register(s0); // "s" registers for samplers
 
 // --------------------------------------------------------
 // The entry point (main method) for our pixel shader
@@ -47,42 +36,60 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//float2 uvScale = float2(5, 5); // Multiple tiles of same texture
 	//float2 uvOffset = float2(time, 0); // Texture looks like it moves
 
-	//input.normal = normalize(...);
+	// Interpolation of normals across a triangle face results in non-unit vectors, so normalize
+    input.normal = normalize(input.normal);
+    input.tangent = normalize(input.tangent); // Normalize to ensure orthogonal (90 degrees apart)
 	
 	// Adjust the uv coords by scale & offset for repeating textures
     input.uv = input.uv * uvScale + uvOffset;
+	
+	// Add normal map for the appearence of depth	
+	// Unpack the normal (Convert it from [0 – 1] (how colors are stored in textures) to [-1 – 1] range 
+    float3 unpackedNormal = NormalMap.Sample(BasicSampler, input.uv).rgb * 2 - 1;
+    unpackedNormal = normalize(unpackedNormal); // Don’t forget to normalize!
+	
+	// Create the 3x3 rotation matrix for converting tangent to world space
+    float3 N = input.normal; 
+    float3 T = normalize(input.tangent - N * dot(input.tangent, N)); // Gram-Schmidt assumes T&N are normalized!
+    float3 B = cross(T, N);
+    float3x3 TBN = float3x3(T, B, N);
+
+	// Assumes that input.normal is the normal later in the shader
+    input.normal = mul(unpackedNormal, TBN); // Note multiplication order!
 
 	// Sample the texture color and apply the tint
     float4 textureColor = SurfaceTexture.Sample(BasicSampler, input.uv);
     textureColor *= colorTint;
-    return textureColor;
-
-	// *** Will have to make adjustments to this ***
-	/*float3 totalLight = float3(0, 0, 0);
-	float3 lightColor = float3(1, 1, 1);
-	float lightIntens = 1.0f;
-	float3 lightDir = float3(1, 0, 0);
-
-	// Diffuse calc
-	float3 diffuseTerm =
-		max(dot(input.normal, -lightDir), 0) * lightIntens * lightColor  * textureColor; // *** Need to be normalized ***
-
-	// Specular calc
-	float3 reflect = reflect(lightDir, input.normal);
-	float3 viewVector = normalize(camperaPosition - input.worldPos);
-
-	float3 specularTerm = pow(max(dot(reflect, viewVector), 0), 64) * lightIntens * lightColor * textureColor; // The bigger the power, the smaller the shine
-	// To replicate a fully white shine, don't mulyiply by textureColor
-
-	// Ambient
-	float3 ambientColor = float3(0.5f, 0.5f, 0.5f);
-	float3 ambientTerm = ambientColor * textureColor;
-
-	// Combine ALL lights
-	totalLight += ambientTerm + diffuseTerm + specularTerm;
-
-	return float4(totalLight, 1);*/
-
+    //return textureColor;
+	
+	// Apply the ambient lighting to the surface color
+	float3 totalLight = ambientColor * textureColor.xyz;
+	
+	// Loop thru & add all the lights
+    for (int i = 0; i < 5; i++)
+    {
+		// Make extra sure the light's direction is normalized
+		Light light = lights[i];
+		light.Direction = normalize(light.Direction);
+		
+        switch (light.Type)
+        {
+            case LIGHT_TYPE_DIRECTIONAL:
+                totalLight += DirectLight(light, input.normal, currentCamPos, input.worldPosition, roughness, textureColor.xyz);
+                break;
+			
+            case LIGHT_TYPE_POINT:
+                totalLight += PointLight(light, input.normal, currentCamPos, input.worldPosition, roughness, textureColor.xyz);
+                break;
+			
+            case LIGHT_TYPE_SPOT:
+                totalLight += SpotLight(light, input.normal, currentCamPos, input.worldPosition, roughness, textureColor.xyz);
+                break;
+        }
+    }
+	
+    return float4(totalLight, 1);
+	
 	//return input.color;
 	//return float4(input.normal, 1);
 	//return float4(input.uv, 0, 1);

@@ -9,6 +9,8 @@
 #include "Transform.h"
 #include "GameEntity.h"
 #include "Camera.h"
+#include "Lights.h"
+#include "Sky.h"
 
 class Game
 {
@@ -30,10 +32,12 @@ private:
 	// Initialization helper methods - feel free to customize, combine, remove, etc.
 	void CreateGeometry(); 
 	void RefreshImGui(float deltaTime);
-	void BuildUI(std::vector<std::shared_ptr<Mesh>> meshes, 
+	void BuildUI(std::vector<std::shared_ptr<Mesh>> meshes,
 		std::vector<std::shared_ptr<GameEntity>> entities,
-		std::vector<std::shared_ptr<Camera>> cameraViews, 
-		std::shared_ptr<Camera> &activeCamera);
+		std::vector<std::shared_ptr<Camera>> cameraViews,
+		std::shared_ptr<Camera>& activeCamera,
+		std::vector<Light>& lights,
+		DirectX::XMFLOAT3& ambientTerm);
 
 	// Initialize UI variables 
 	float color[4] = { 0.4f, 0.75f, 0.7f, 1.0f }; // Background color
@@ -73,6 +77,8 @@ private:
 	std::shared_ptr<Material> blackTealMarbleMaterial;
 	std::shared_ptr<Material> blueTravertineMaterial;
 	std::shared_ptr<Material> deepBlueTravertineMaterial;
+	std::shared_ptr<Material> woodDiagArrowsMaterial;
+	std::shared_ptr<Material> smoothedRockMaterial;
 	std::shared_ptr<Material> comboMaterial;
 
 	// Create a list of shared pointers to entities for drawing
@@ -90,5 +96,15 @@ private:
 	std::shared_ptr<Camera> activeCamera;
 	std::shared_ptr<Camera> frontCamera;
 	std::shared_ptr<Camera> sideCamera;
+
+	// Create a list of all the lights in the scene
+	std::vector<Light> lights;
+
+	// Simple approximation of global illumination: all the light that bounces around a scene
+	// i.e. A single color that represents the minimum light level in a scene
+	DirectX::XMFLOAT3 ambientTerm; 
+
+	// Pointer to the sky box
+	std::shared_ptr<Sky> skyBox;
 };
 

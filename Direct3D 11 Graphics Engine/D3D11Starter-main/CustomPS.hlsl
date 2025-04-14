@@ -1,15 +1,9 @@
+#include "ShaderInclude.hlsli"
+
 cbuffer ExternalData : register(b0)
 {
     float4 colorTint;
 }
-
-// Struct of data from earlier in the pipeline
-struct VertexToPixel
-{
-    float4 screenPosition : SV_POSITION;
-    float2 uv : TEXCOORD;
-    float3 normal : NORMAL;
-};
 
 // Very simple pseudo-random function for noise, which takes a 2D vector as input
 float random(float2 s)

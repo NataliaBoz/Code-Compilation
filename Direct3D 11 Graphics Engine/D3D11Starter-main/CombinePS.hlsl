@@ -1,3 +1,5 @@
+#include "ShaderInclude.hlsli"
+
 cbuffer ExternalData : register(b0)
 {
     float4 colorTint;
@@ -9,13 +11,6 @@ Texture2D InitialTexture : register(t0); // "t" registers for textures
 Texture2D CombineTexture : register(t1);
 
 SamplerState BasicSampler : register(s0); // "s" registers for samplers
-
-struct VertexToPixel
-{
-    float4 screenPosition : SV_POSITION;
-    float2 uv : TEXCOORD;
-    float3 normal : NORMAL;
-};
 
 float4 main(VertexToPixel input) : SV_TARGET
 {	

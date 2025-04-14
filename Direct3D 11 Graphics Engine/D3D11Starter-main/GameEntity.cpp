@@ -39,6 +39,8 @@ void GameEntity::Draw(std::shared_ptr<Camera> camera)
 	ps->SetFloat4("colorTint", material->GetColorTint());
 	ps->SetFloat2("uvScale", material->GetUVScale());
 	ps->SetFloat2("uvOffset", material->GetUVOffset());
+	ps->SetFloat("roughness", material->GetRoughness());
+	ps->SetFloat3("currentCamPos", camera->GetTransform()->GetPosition());
 
 	// Maps, memcpys, & unmaps struct
 	vs->CopyAllBufferData(); // Copies data to GPU; CAN'T DRAW WITHOUT!

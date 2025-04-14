@@ -1,3 +1,4 @@
+#include "ShaderInclude.hlsli" // Contains all necessary structs, helper functions, etc.
 
 // Constant buffer (every vertex gets/reads same data from buffer) (Name is irrevelant)
 cbuffer ExternalData : register(b0) // b0-b14 of buffer indeices
@@ -9,43 +10,6 @@ cbuffer ExternalData : register(b0) // b0-b14 of buffer indeices
 	matrix worldInvTransp;
 	
 }
-
-// Struct representing a single vertex worth of data
-// - This should match the vertex definition in our C++ code
-// - By "match", I mean the size, order and number of members
-// - The name of the struct itself is unimportant, but should be descriptive
-// - Each variable must have a semantic, which defines its usage
-struct VertexShaderInput
-{ 
-	// Data type
-	//  |
-	//  |   Name          Semantic
-	//  |    |                |
-	//  v    v                v
-	float3 localPosition	: POSITION;     // XYZ position
-	float2 uv				: TEXCOORD; //float4 color			: COLOR;        // RGBA color
-	float3 normal			: NORMAL;
-	float3 tangent			: TANGENT;
-};
-
-// Struct representing the data we're sending down the pipeline
-// - Should match our pixel shader's input (hence the name: Vertex to Pixel)
-// - At a minimum, we need a piece of data defined tagged as SV_POSITION
-// - The name of the struct itself is unimportant, but should be descriptive
-// - Each variable must have a semantic, which defines its usage
-struct VertexToPixel
-{
-	// Data type
-	//  |
-	//  |   Name          Semantic
-	//  |    |                |
-	//  v    v                v
-	float4 screenPosition	: SV_POSITION;	// XYZW position (System Value Position)
-	//float4 color			: COLOR;        // RGBA color
-	float2 uv				: TEXCOORD; 
-	float3 normal			: NORMAL;
-	//float3 worldPos			: POSITION;
-};
 
 // --------------------------------------------------------
 // The entry point (main method) for our vertex shader
@@ -74,7 +38,7 @@ VertexToPixel main( VertexShaderInput input )
     matrix wvp = mul(projection, mul(view, world));
     output.screenPosition = mul(wvp, float4(input.localPosition, 1.0f));
 
-	//output.worldPos = mul(world, float4(input.localPosition, 1.0f));
+    output.worldPosition = mul(world, float4(input.localPosition, 1.0f)).xyz;
 
 	// Pass the color through 
 	// - The values will be interpolated per-pixel by the rasterizer
@@ -86,8 +50,8 @@ VertexToPixel main( VertexShaderInput input )
 
 	output.uv = input.uv; 
 	output.normal = input.normal;
-	//output.normal = normalize(mul((float3x3)worldInvTransp, input.normal)); // Treating normal as lighting instead of just color
-	//output.tangent = normalize(mul((float3x3)world, input.tangent));
+	output.normal = normalize(mul((float3x3)worldInvTransp, input.normal)); // Treating normal as lighting (rotate it)
+	output.tangent = normalize(mul((float3x3)world, input.tangent)); // Similarly, rotate the incoming tangent
 
 	// Whatever we return will make its way through the pipeline to the
 	// next programmable stage we're using (the pixel shader for now)
