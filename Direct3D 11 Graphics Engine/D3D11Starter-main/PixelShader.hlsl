@@ -5,16 +5,19 @@ cbuffer ExternalData : register(b0)
 	float4 colorTint;
     float2 uvScale;
     float2 uvOffset;
-    float roughness;
 	float3 currentCamPos;
-    float3 ambientColor;
-    Light lights[5]; // Max # of lights (must change before going over)
+    //float3 ambientColor;
+    Light lights[6]; // Max # of lights (must change before going over)
 }
 
-Texture2D SurfaceTexture : register(t0); // "t" registers for textures
-Texture2D NormalMap : register(t1);
+Texture2D SurfaceTexture : register(t0); // Albedo
+Texture2D NormalMap : register(t1); // "t" registers for textures
+Texture2D RoughnessMap : register(t2);
+Texture2D MetalnessMap : register(t3);
+Texture2D ShadowMap : register(t4);
 
 SamplerState BasicSampler : register(s0); // "s" registers for samplers
+SamplerComparisonState ShadowSampler : register(s1);
 
 // --------------------------------------------------------
 // The entry point (main method) for our pixel shader
@@ -27,6 +30,23 @@ SamplerState BasicSampler : register(s0); // "s" registers for samplers
 // --------------------------------------------------------
 float4 main(VertexToPixel input) : SV_TARGET
 {
+	// Perform the perspective divide (divide by W) ourselves
+    input.shadowMapPos /= input.shadowMapPos.w;
+    
+    // Convert the normalized device coordinates to UVs for sampling
+    float2 shadowUV = input.shadowMapPos.xy * 0.5f + 0.5f;
+    shadowUV.y = 1 - shadowUV.y; // Flip the Y
+    
+    // Grab the distances we need: light-to-pixel and closest-surface
+    float distToLight = input.shadowMapPos.z;
+    // Get a ratio of comparison results using SampleCmpLevelZero()
+    float shadowAmount = ShadowMap.SampleCmpLevelZero(ShadowSampler, shadowUV, distToLight).r;
+    //float distShadowMap = ShadowMap.Sample(BasicSampler, shadowUV).r;
+    
+    // For testing, just return black where there are shadows.
+    /*if (distShadowMap < distToLight)
+        return float4(0, 0, 0, 1);*/
+	
 	// Just return the input color
 	// - This color (like most values passing through the rasterizer) is 
 	//   interpolated for each pixel between the corresponding vertices 
@@ -35,6 +55,14 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	//float2 uvScale = float2(5, 5); // Multiple tiles of same texture
 	//float2 uvOffset = float2(time, 0); // Texture looks like it moves
+
+	// Perspective divide shadow map
+	//input.shadowMapPos.xyz /= input.shadowMapPos.w;
+	//float2 shadowUV = input.shadowMapPos.xy * 0.5f + 0.5f;
+	//shadowUV.y = 1.0f - shadowUV.y;
+
+	////float shadowMapDist = ShadowMap.Sample(BasicSampler, shadowUV).r;
+	//float shadowAmount = ShadowMap.SampleCmpLevelZero(ShadowSampler, shadowUV, inputshadowMapPos.z);
 
 	// Interpolation of normals across a triangle face results in non-unit vectors, so normalize
     input.normal = normalize(input.normal);
@@ -56,17 +84,27 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	// Assumes that input.normal is the normal later in the shader
     input.normal = mul(unpackedNormal, TBN); // Note multiplication order!
-
-	// Sample the texture color and apply the tint
-    float4 textureColor = SurfaceTexture.Sample(BasicSampler, input.uv);
-    textureColor *= colorTint;
+    
+	// Grab the red channel after sampling the roughness & metalness textures
+    float roughness = RoughnessMap.Sample(BasicSampler, input.uv).r;
+    float metalness = MetalnessMap.Sample(BasicSampler, input.uv).r;
+    
+	// Sample the texture color & apply the tint for lighting 
+    float4 textureColor = pow(SurfaceTexture.Sample(BasicSampler, input.uv).rgba, 2.2f);
     //return textureColor;
+    float3 totalLight = 0;
+	
+	// Specular color determination -----------------
+	// Assume albedo texture is actually holding specular color where metalness == 1
+	// Note the use of lerp here - metal is generally 0 or 1, but might be in between
+	// because of linear texture sampling, so we lerp the specular color to match
+    float3 specularColor = lerp(F0_NON_METAL, textureColor.rgb, metalness);
 	
 	// Apply the ambient lighting to the surface color
-	float3 totalLight = ambientColor * textureColor.xyz;
-	
+	//float3 totalLight = ambientColor * textureColor.xyz;
+    
 	// Loop thru & add all the lights
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 6; i++)
     {
 		// Make extra sure the light's direction is normalized
 		Light light = lights[i];
@@ -75,20 +113,30 @@ float4 main(VertexToPixel input) : SV_TARGET
         switch (light.Type)
         {
             case LIGHT_TYPE_DIRECTIONAL:
-                totalLight += DirectLight(light, input.normal, currentCamPos, input.worldPosition, roughness, textureColor.xyz);
+                // Calculate directional light
+                float3 lightResult = DirectLight(light, input.normal, currentCamPos, input.worldPosition, roughness, metalness, textureColor.xyz, specularColor);
+
+                // If this is the first light, apply the shadowing result
+                if (i == 0)
+                {
+                    lightResult *= shadowAmount;
+                }
+                // Add this light's result to the total light for this pixel
+                totalLight += lightResult;
                 break;
 			
             case LIGHT_TYPE_POINT:
-                totalLight += PointLight(light, input.normal, currentCamPos, input.worldPosition, roughness, textureColor.xyz);
+                totalLight += PointLight(light, input.normal, currentCamPos, input.worldPosition, roughness, metalness, textureColor.xyz, specularColor);
                 break;
 			
             case LIGHT_TYPE_SPOT:
-                totalLight += SpotLight(light, input.normal, currentCamPos, input.worldPosition, roughness, textureColor.xyz);
+                totalLight += SpotLight(light, input.normal, currentCamPos, input.worldPosition, roughness, metalness, textureColor.xyz, specularColor);
                 break;
         }
     }
 	
-    return float4(totalLight, 1);
+    return float4(pow(totalLight, 1.0f / 2.2f), 1); // With gamma correction
+    //return float4(totalLight, 1);
 	
 	//return input.color;
 	//return float4(input.normal, 1);

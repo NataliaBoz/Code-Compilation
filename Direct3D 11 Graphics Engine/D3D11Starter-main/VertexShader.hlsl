@@ -8,7 +8,8 @@ cbuffer ExternalData : register(b0) // b0-b14 of buffer indeices
 	matrix view;
 	matrix projection;
 	matrix worldInvTransp;
-	
+	matrix lightView;
+	matrix lightProj;
 }
 
 // --------------------------------------------------------
@@ -38,6 +39,10 @@ VertexToPixel main( VertexShaderInput input )
     matrix wvp = mul(projection, mul(view, world));
     output.screenPosition = mul(wvp, float4(input.localPosition, 1.0f));
 
+	// Shadow map
+	//matrix shadowWVP = mul(lightProj, mul(lightView, world));
+	//output.screenPosition = mul(shadowWVP, float4(input.localPosition, 1.0f));
+
     output.worldPosition = mul(world, float4(input.localPosition, 1.0f)).xyz;
 
 	// Pass the color through 
@@ -49,9 +54,13 @@ VertexToPixel main( VertexShaderInput input )
     //output.color = colorTint; 
 
 	output.uv = input.uv; 
-	output.normal = input.normal;
+	//output.normal = input.normal;
 	output.normal = normalize(mul((float3x3)worldInvTransp, input.normal)); // Treating normal as lighting (rotate it)
 	output.tangent = normalize(mul((float3x3)world, input.tangent)); // Similarly, rotate the incoming tangent
+	
+	// Calc WVP for shadow map
+    matrix shadowWVP = mul(lightProj, mul(lightView, world));
+    output.shadowMapPos = mul(shadowWVP, float4(input.localPosition, 1.0f));
 
 	// Whatever we return will make its way through the pipeline to the
 	// next programmable stage we're using (the pixel shader for now)
