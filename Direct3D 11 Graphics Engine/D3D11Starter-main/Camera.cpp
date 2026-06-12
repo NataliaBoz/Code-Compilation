@@ -56,6 +56,7 @@ void Camera::Update(float deltaTime)
 		XMFLOAT3 rot = transform->GetPitchYawRoll();
 		if (rot.x > XM_PIDIV2) { rot.x = XM_PIDIV2 - 0.0001f; } // Clamp to 1/2 pi, -1/2 pi
 		if (rot.x < -XM_PIDIV2) { rot.x = -XM_PIDIV2 + 0.0001f; }
+		transform->SetRotation(rot);
 	}
 
 	// Ensure view matrix actually matches camera’s current transform

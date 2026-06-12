@@ -13,7 +13,6 @@ public:
 	// Constructor
 	Material(const char* name,
 		DirectX::XMFLOAT4 colorTint,
-		float roughness,
 		std::shared_ptr<SimpleVertexShader> vertShader, 
 		std::shared_ptr<SimplePixelShader> pixShader, 
 		DirectX::XMFLOAT2 uvScale = DirectX::XMFLOAT2(1, 1),
@@ -22,7 +21,6 @@ public:
 	// Getters
 	const char* GetMaterialName();
 	DirectX::XMFLOAT4 GetColorTint(); 
-	float GetRoughness();
 	std::shared_ptr<SimpleVertexShader> GetVertexShader();
 	std::shared_ptr<SimplePixelShader> GetPixelShader();
 	DirectX::XMFLOAT2 GetUVScale();
@@ -32,7 +30,6 @@ public:
 
 	// Setters
 	void SetColorTint(DirectX::XMFLOAT4 tint);
-	void SetRoughness(float roughness);
 	void SetVertexShader(std::shared_ptr<SimpleVertexShader> vertShader);
 	void SetPixelShader(std::shared_ptr<SimplePixelShader> pixShader);
 	void SetUVScale(DirectX::XMFLOAT2 uvScale);
@@ -44,7 +41,6 @@ public:
 private:
 	// Fields
 	DirectX::XMFLOAT4 colorTint;
-	float roughness;
 	std::shared_ptr<SimpleVertexShader> vertShader;
 	std::shared_ptr<SimplePixelShader> pixShader;
 	DirectX::XMFLOAT2 uvScale;

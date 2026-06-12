@@ -35,11 +35,12 @@ void GameEntity::Draw(std::shared_ptr<Camera> camera)
 	vs->SetMatrix4x4("view", camera->GetView());			// names in your shader’s cbuffer!
 	vs->SetMatrix4x4("projection", camera->GetProjection()); 
 	vs->SetMatrix4x4("worldInvTransp", transform->GetWorldInverseTransposeMatrix());
+	//vs->SetMatrix4x4("lightView", shadowOptions.LightViewMatrix);
+	//vs->SetMatrix4x4("lightProj", shadowOptions.LightProjectionMatrix);
 
 	ps->SetFloat4("colorTint", material->GetColorTint());
 	ps->SetFloat2("uvScale", material->GetUVScale());
 	ps->SetFloat2("uvOffset", material->GetUVOffset());
-	ps->SetFloat("roughness", material->GetRoughness());
 	ps->SetFloat3("currentCamPos", camera->GetTransform()->GetPosition());
 
 	// Maps, memcpys, & unmaps struct
